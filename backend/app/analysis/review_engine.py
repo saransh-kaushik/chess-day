@@ -57,7 +57,12 @@ class ReviewEngine:
         self._positional = PositionalDetector()
         self._endgame = EndgameDetector()
 
-    def analyse_game(self, game_id: str, db: Session) -> ReviewResult:
+    def analyse_game(
+        self,
+        game_id: str,
+        db: Session,
+        depth: int | None = None,
+    ) -> ReviewResult:
         """
         Run a full game review and return a structured ReviewResult.
 
@@ -135,8 +140,8 @@ class ReviewEngine:
         san_sequence = [m.san for m in moves]
 
         # ── 2. Run Stockfish ──────────────────────────────────────────────────
-        depth = settings.STOCKFISH_ANALYSIS_DEPTH
-        position_analyses = self._run_stockfish(uci_sequence, game.initial_fen, depth)
+        analysis_depth = depth or settings.STOCKFISH_ANALYSIS_DEPTH
+        position_analyses = self._run_stockfish(uci_sequence, game.initial_fen, analysis_depth)
 
         # ── 3 & 4. Per-move analysis ──────────────────────────────────────────
         move_analyses: list[MoveAnalysis] = []
@@ -205,7 +210,7 @@ class ReviewEngine:
             )
 
             move_analyses.append(MoveAnalysis(
-                move_number=move.move_number,
+                move_number=(i // 2) + 1,
                 color=color,
                 uci=move.uci,
                 san=move.san,
@@ -270,7 +275,7 @@ class ReviewEngine:
         return ReviewResult(
             game_id=game_id,
             opening=opening_result,
-            analysis_depth=depth,
+            analysis_depth=analysis_depth,
             white=white_summary,
             black=black_summary,
             moves=move_analyses,

@@ -9,9 +9,9 @@ import { useNavigate } from 'react-router-dom';
 import { useGameReview } from '../hooks/useGameReview';
 
 export const LocalGamePage = () => {
-  const { game, gameState, makeMove, resetGame, resign, offerDraw, isGameOver, legalMoves } = useChessGame();
+  const { gameState, makeMove, resetGame, resign, offerDraw, isGameOver, legalMoves } = useChessGame();
   const navigate = useNavigate();
-  const { analyzeLocally, isAnalyzing } = useGameReview();
+  const { isAnalyzing } = useGameReview();
 
   useEffect(() => {
     if (gameState.status === 'idle') {
@@ -19,8 +19,7 @@ export const LocalGamePage = () => {
     }
   }, []);
 
-  const handleReview = async () => {
-    await analyzeLocally(game.pgn());
+  const handleReview = () => {
     navigate('/review');
   };
 

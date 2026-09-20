@@ -6,12 +6,18 @@ Registers all routers, configures CORS, and exposes health/info endpoints.
 
 from __future__ import annotations
 
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import auth, games, online, analysis, stats
 from app.config import settings
 from app.database import create_all_tables
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
 
 # ── Application ───────────────────────────────────────────────────────────────
 

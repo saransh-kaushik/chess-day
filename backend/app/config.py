@@ -16,9 +16,9 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
 
     # ── Stockfish ─────────────────────────────────────────────────────────────
-    STOCKFISH_PATH: str = "/usr/local/bin/stockfish"
-    STOCKFISH_DEPTH: int = 20
-    STOCKFISH_ANALYSIS_DEPTH: int = 25
+    STOCKFISH_PATH: str = "/usr/games/stockfish"
+    STOCKFISH_DEPTH: int = 14
+    STOCKFISH_ANALYSIS_DEPTH: int = 14
 
     # ── Move classification thresholds (in pawns / full units) ────────────────
     # These are compared against centipawn-loss divided by 100.

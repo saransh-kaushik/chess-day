@@ -10,6 +10,9 @@ export interface TacticalEvent {
 export interface MoveAnalysis {
   moveNumber: number;
   san: string;
+  uci?: string;
+  fenBefore?: string;
+  fenAfter?: string;
   color: 'white' | 'black';
   classification: MoveClassification;
   evalBefore: number;       // centipawns

@@ -40,19 +40,25 @@ export const useChessGame = (): UseChessGameReturn => {
       const to = uci.substring(2, 4);
       const promotion = uci.length > 4 ? uci.substring(4) : undefined;
       
+      const fenBefore = game.fen();
       const move = game.move({ from, to, promotion });
       if (move) {
-        const newGame = new Chess(game.fen());
-        setGame(newGame);
+        const fenAfter = game.fen();
+        const nextGame = new Chess();
+        nextGame.loadPgn(game.pgn());
+        setGame(nextGame);
+
+        const moveNumber = Math.floor((nextGame.history().length - 1) / 2) + 1;
         addMove({
           uci,
           san: move.san,
-          fenBefore: game.fen(),
-          fenAfter: newGame.fen(),
-          moveNumber: Math.floor((game.history().length) / 2) + 1,
+          fenBefore,
+          fenAfter,
+          moveNumber,
           color: move.color === 'w' ? 'white' : 'black',
           timestamp: Date.now(),
         });
+        setGameState({ pgn: nextGame.pgn() });
         return true;
       }
     } catch (e) {

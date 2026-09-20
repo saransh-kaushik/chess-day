@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChessBoard } from '../components/board/ChessBoard';
 import { EvalGraph, EvaluationBar, ReviewPanel, ReviewControls } from '../components/review';
@@ -23,19 +23,19 @@ export const ReviewPage: React.FC = () => {
     goToNext,
     goToStart,
     goToEnd,
-    analyzeLocally,
+    requestBackendAnalysis,
     requestDeepAnalysis,
   } = useGameReview();
 
-  const [analysisStarted, setAnalysisStarted] = useState(false);
+  const hasRequestedRef = useRef(false);
 
-  // Auto-start analysis when page loads and we have moves
+  // Auto-start backend analysis when page loads and we have moves
   useEffect(() => {
-    if (!analysisStarted && gameState.moves.length > 0 && !review) {
-      setAnalysisStarted(true);
-      analyzeLocally(gameState.pgn);
+    if (!hasRequestedRef.current && !review && !isAnalyzing && gameState.moves.length > 0) {
+      hasRequestedRef.current = true;
+      requestBackendAnalysis();
     }
-  }, [analysisStarted, gameState.moves.length, gameState.pgn, review, analyzeLocally]);
+  }, [review, isAnalyzing, gameState.moves.length, requestBackendAnalysis]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -67,15 +67,15 @@ export const ReviewPage: React.FC = () => {
   }
 
   // Analysis loading
-  if (isAnalyzing || (!review && analysisStarted)) {
+  if (isAnalyzing || (!review && hasRequestedRef.current)) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center space-y-4">
           <LoadingSpinner size="lg" />
-          <h2 className="text-xl font-bold text-white">Analyzing Game…</h2>
+          <h2 className="text-xl font-bold text-white">Analyzing Game with Backend Engine…</h2>
           <div className="w-64 bg-gray-700 rounded-full h-2 mx-auto">
             <div
-              className="bg-amber-500 h-2 rounded-full transition-all"
+              className="bg-amber-500 h-2 rounded-full transition-all duration-300"
               style={{ width: `${analysisProgress}%` }}
             />
           </div>
@@ -88,7 +88,7 @@ export const ReviewPage: React.FC = () => {
   if (!review) return null;
 
   const evaluations = review.moves.map((m) => m.evalAfter);
-  const currentEval = currentMoveAnalysis?.evalAfter ?? 0;
+  const currentEval = currentMoveAnalysis?.evalAfter ? (currentMoveAnalysis.evalAfter / 100) : 0;
   const mateIn = undefined; // extend later if mate detection is added
 
   return (
@@ -110,13 +110,14 @@ export const ReviewPage: React.FC = () => {
             </span>
           )}
         </div>
-        {/* Deep analysis button (requires backend) */}
-        {user && !user.isGuest && gameState.id && (
+        {/* Deep analysis button */}
+        {user && !user.isGuest && (gameState.id || review.gameId) && (
           <button
-            onClick={() => requestDeepAnalysis(gameState.id!)}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg transition-colors"
+            onClick={() => requestDeepAnalysis(gameState.id || review.gameId)}
+            disabled={isAnalyzing}
+            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg transition-colors disabled:opacity-50"
           >
-            Deep Analysis
+            {isAnalyzing ? 'Analyzing…' : 'Deep Analysis'}
           </button>
         )}
       </div>
@@ -136,9 +137,9 @@ export const ReviewPage: React.FC = () => {
                 lastMove={
                   currentMoveAnalysis
                     ? (() => {
-                        const mv = gameState.moves[currentMoveIndex - 1];
-                        return mv
-                          ? { from: mv.uci.slice(0, 2), to: mv.uci.slice(2, 4) }
+                        const uci = currentMoveAnalysis.uci || gameState.moves[currentMoveIndex - 1]?.uci;
+                        return uci
+                          ? { from: uci.slice(0, 2), to: uci.slice(2, 4) }
                           : null;
                       })()
                     : null
