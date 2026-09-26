@@ -10,7 +10,7 @@ interface ReviewControlsProps {
 }
 
 /**
- * Navigation controls for stepping through game review positions.
+ * Media-player-style navigation controls for stepping through game review positions.
  */
 export const ReviewControls: React.FC<ReviewControlsProps> = ({
   currentIndex,
@@ -24,56 +24,60 @@ export const ReviewControls: React.FC<ReviewControlsProps> = ({
   const atEnd = currentIndex >= totalMoves;
 
   const btnBase =
-    'px-3 py-2 rounded text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed';
-  const primary = 'bg-gray-700 hover:bg-gray-600 text-white';
+    'flex items-center justify-center w-10 h-10 rounded-lg text-lg font-medium transition-all duration-150 ' +
+    'disabled:opacity-35 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-amber-500/40';
+  const btnStyle = 'bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-white';
 
   return (
-    <div className="flex items-center justify-between px-2 py-2 bg-gray-900 rounded-b">
-      <div className="flex gap-1">
-        {/* Go to start */}
+    <div className="flex items-center justify-between px-4 py-3 bg-gray-800 border-t border-gray-700/60">
+      {/* Left controls */}
+      <div className="flex items-center gap-2">
         <button
-          className={`${btnBase} ${primary}`}
+          className={`${btnBase} ${btnStyle}`}
           onClick={onStart}
           disabled={atStart}
-          title="Start"
+          title="Go to start"
           aria-label="Go to start"
         >
           ⏮
         </button>
-        {/* Previous */}
         <button
-          className={`${btnBase} ${primary}`}
+          className={`${btnBase} ${btnStyle}`}
           onClick={onPrevious}
           disabled={atStart}
           title="Previous move"
           aria-label="Previous move"
         >
-          ← Prev
+          ←
         </button>
       </div>
 
-      {/* Move counter */}
-      <span className="text-gray-400 text-sm tabular-nums">
-        {currentIndex} / {totalMoves}
-      </span>
+      {/* Center: move counter */}
+      <div className="flex flex-col items-center">
+        <span className="text-white font-semibold text-sm tabular-nums">
+          Move{' '}
+          <span className="text-amber-400">{currentIndex}</span>
+          {' '}/{' '}{totalMoves}
+        </span>
+        <span className="text-gray-500 text-xs">Use ← → keys</span>
+      </div>
 
-      <div className="flex gap-1">
-        {/* Next */}
+      {/* Right controls */}
+      <div className="flex items-center gap-2">
         <button
-          className={`${btnBase} ${primary}`}
+          className={`${btnBase} ${btnStyle}`}
           onClick={onNext}
           disabled={atEnd}
           title="Next move"
           aria-label="Next move"
         >
-          Next →
+          →
         </button>
-        {/* Go to end */}
         <button
-          className={`${btnBase} ${primary}`}
+          className={`${btnBase} ${btnStyle}`}
           onClick={onEnd}
           disabled={atEnd}
-          title="End"
+          title="Go to end"
           aria-label="Go to end"
         >
           ⏭

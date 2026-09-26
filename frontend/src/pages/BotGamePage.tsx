@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChessBoard } from '../components/board/ChessBoard';
 import { MoveList } from '../components/game/MoveList';
@@ -10,6 +10,8 @@ import { useStockfish } from '../hooks/useStockfish';
 import { useGameStore } from '../store/gameStore';
 import { BOT_SKILL_LEVELS, TIME_CONTROLS } from '../config/constants';
 import { PlayerColor, TimeControl } from '../types/chess';
+import { useChessSound } from '../hooks/useChessSound';
+
 
 type SetupStep = 'setup' | 'playing' | 'finished';
 
@@ -26,8 +28,11 @@ export const BotGamePage: React.FC = () => {
   const { game, gameState, legalMoves, makeMove, resetGame, resign, isGameOver } = useChessGame();
   const { isReady, getBestMove } = useStockfish();
   const { gameState: gs } = useGameStore();
+  const { playSound } = useChessSound();
+  const prevMoveCountRef = useRef(gs.moves.length);
 
   const botColor: PlayerColor = playerColor === 'white' ? 'black' : 'white';
+
   const skill = BOT_SKILL_LEVELS[skillIndex];
 
   // Computed boolean — stable derivation, no function in deps
@@ -42,9 +47,26 @@ export const BotGamePage: React.FC = () => {
     return (botColor === 'white' && whiteTurn) || (botColor === 'black' && !whiteTurn);
   }, [game, botColor]);
 
+  // Play sound on every new move (player or bot)
+  useEffect(() => {
+    if (gs.moves.length === prevMoveCountRef.current) return;
+    prevMoveCountRef.current = gs.moves.length;
+    const lastMove = gs.moves[gs.moves.length - 1];
+    if (!lastMove) return;
+    const san = lastMove.san ?? '';
+    if (san.includes('#') || san.includes('+')) {
+      playSound('check');
+    } else if (san.includes('x')) {
+      playSound('capture');
+    } else {
+      playSound('move');
+    }
+  }, [gs.moves, playSound]);
+
   // Trigger bot move whenever it's the bot's turn
   useEffect(() => {
     if (step !== 'playing' || isGameOver || !isReady || !isBotTurnNow) return;
+
 
     let cancelled = false;
     setIsBotThinking(true);

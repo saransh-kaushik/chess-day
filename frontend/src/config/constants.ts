@@ -33,10 +33,18 @@ export const CLASSIFICATION_COLORS: Record<string, string> = {
   BLUNDER: '#c41e3a',
 };
 
+export const CLASSIFICATION_SYMBOLS: Record<string, string> = {
+  BEST: '★',
+  GOOD: '✓',
+  INACCURACY: '?!',
+  MISTAKE: '?',
+  BLUNDER: '??',
+};
+
 export const CLASSIFICATION_LABELS: Record<string, string> = {
-  BEST: '★ Best',
-  GOOD: '✓ Good',
-  INACCURACY: '💡 Inaccuracy',
-  MISTAKE: '❓ Mistake',
-  BLUNDER: '❌ Blunder',
+  BEST: 'Best',
+  GOOD: 'Good',
+  INACCURACY: 'Inaccuracy',
+  MISTAKE: 'Mistake',
+  BLUNDER: 'Blunder',
 };

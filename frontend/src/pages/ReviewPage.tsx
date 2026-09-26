@@ -7,12 +7,14 @@ import { useGameReview } from '../hooks/useGameReview';
 import { useGameStore } from '../store/gameStore';
 import { useAnalysisStore } from '../store/analysisStore';
 import { useAuthStore } from '../store/authStore';
+import { useChessSound } from '../hooks/useChessSound';
 
 export const ReviewPage: React.FC = () => {
   const navigate = useNavigate();
   const { gameState } = useGameStore();
   const { review, isAnalyzing, analysisProgress } = useAnalysisStore();
   const { user } = useAuthStore();
+  const { playSound } = useChessSound();
 
   const {
     currentMoveIndex,
@@ -28,6 +30,7 @@ export const ReviewPage: React.FC = () => {
   } = useGameReview();
 
   const hasRequestedRef = useRef(false);
+  const prevMoveIndexRef = useRef(currentMoveIndex);
 
   // Auto-start backend analysis when page loads and we have moves
   useEffect(() => {
@@ -36,6 +39,30 @@ export const ReviewPage: React.FC = () => {
       requestBackendAnalysis();
     }
   }, [review, isAnalyzing, gameState.moves.length, requestBackendAnalysis]);
+
+  // Play sounds when navigating moves
+  useEffect(() => {
+    if (currentMoveIndex === prevMoveIndexRef.current) return;
+    prevMoveIndexRef.current = currentMoveIndex;
+
+    if (!currentMoveAnalysis) {
+      playSound('navigate');
+      return;
+    }
+
+    const cls = currentMoveAnalysis.classification;
+    if (cls === 'BLUNDER') {
+      playSound('blunder');
+    } else if (cls === 'MISTAKE') {
+      playSound('mistake');
+    } else if (cls === 'INACCURACY') {
+      playSound('inaccuracy');
+    } else if (cls === 'BEST') {
+      playSound('best');
+    } else {
+      playSound('navigate');
+    }
+  }, [currentMoveIndex, currentMoveAnalysis, playSound]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -52,7 +79,7 @@ export const ReviewPage: React.FC = () => {
   // No game to review
   if (gameState.moves.length === 0 && !review) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
         <div className="text-center space-y-4">
           <p className="text-gray-400">No game to review yet.</p>
           <button
@@ -69,10 +96,10 @@ export const ReviewPage: React.FC = () => {
   // Analysis loading
   if (isAnalyzing || (!review && hasRequestedRef.current)) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-center space-y-4">
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="text-center space-y-4 px-4">
           <LoadingSpinner size="lg" />
-          <h2 className="text-xl font-bold text-white">Analyzing Game with Backend Engine…</h2>
+          <h2 className="text-xl font-bold text-white">Analyzing Game…</h2>
           <div className="w-64 bg-gray-700 rounded-full h-2 mx-auto">
             <div
               className="bg-amber-500 h-2 rounded-full transition-all duration-300"
@@ -88,95 +115,102 @@ export const ReviewPage: React.FC = () => {
   if (!review) return null;
 
   const evaluations = review.moves.map((m) => m.evalAfter);
-  const currentEval = currentMoveAnalysis?.evalAfter ? (currentMoveAnalysis.evalAfter / 100) : 0;
-  const mateIn = undefined; // extend later if mate detection is added
+  const currentEval = currentMoveAnalysis ? currentMoveAnalysis.evalAfter / 100 : 0;
+
+  const lastMoveUci =
+    currentMoveAnalysis?.uci ??
+    (currentMoveIndex > 0 ? gameState.moves[currentMoveIndex - 1]?.uci : undefined);
+  const lastMove = lastMoveUci
+    ? { from: lastMoveUci.slice(0, 2), to: lastMoveUci.slice(2, 4) }
+    : null;
+
+  const openingLabel = review.openingName
+    ? `${review.openingName}${review.openingEco ? ` (${review.openingEco})` : ''}`
+    : 'Game Review';
+
+  // Player names from game state
+  const whiteName = gameState.white?.name ?? 'White';
+  const blackName = gameState.black?.name ?? 'Black';
 
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col">
-      {/* Header */}
-      <div className="bg-gray-800 border-b border-gray-700 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+    <div className="min-h-screen bg-gray-950 flex flex-col">
+      {/* ── Header ── */}
+      <div className="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={() => navigate('/')}
-            className="text-gray-400 hover:text-white transition-colors"
+            className="flex items-center gap-1 text-gray-400 hover:text-white transition-colors text-sm flex-shrink-0"
           >
             ← Home
           </button>
-          <h1 className="text-white font-bold">Game Review</h1>
-          {review.openingName && (
-            <span className="text-gray-400 text-sm hidden sm:inline">
-              — {review.openingName}
-              {review.openingEco && ` (${review.openingEco})`}
-            </span>
-          )}
+          <div className="w-px h-4 bg-gray-700 flex-shrink-0" />
+          <span className="text-white font-semibold text-sm truncate">{openingLabel}</span>
         </div>
-        {/* Deep analysis button */}
+
         {user && !user.isGuest && (gameState.id || review.gameId) && (
           <button
             onClick={() => requestDeepAnalysis(gameState.id || review.gameId)}
             disabled={isAnalyzing}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg transition-colors disabled:opacity-50"
+            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg transition-colors disabled:opacity-50 flex-shrink-0"
           >
-            {isAnalyzing ? 'Analyzing…' : 'Deep Analysis'}
+            {isAnalyzing ? 'Analyzing…' : '⚡ Deep Analysis'}
           </button>
         )}
       </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Main area: board + panel */}
-        <div className="flex-1 flex flex-col lg:flex-row gap-4 p-4 min-h-0">
-          {/* Left: eval bar + board */}
-          <div className="flex gap-2 items-start flex-shrink-0">
-            <EvaluationBar evaluation={currentEval} mateIn={mateIn} />
-            <div className="flex flex-col gap-2">
-              <ChessBoard
-                fen={currentFen}
-                orientation="white"
-                onMove={() => false}
-                interactive={false}
-                lastMove={
-                  currentMoveAnalysis
-                    ? (() => {
-                        const uci = currentMoveAnalysis.uci || gameState.moves[currentMoveIndex - 1]?.uci;
-                        return uci
-                          ? { from: uci.slice(0, 2), to: uci.slice(2, 4) }
-                          : null;
-                      })()
-                    : null
-                }
-              />
+      {/* ── Main content ── */}
+      <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
+        {/* LEFT COLUMN: eval bar + board + graph + controls */}
+        <div className="flex flex-col flex-shrink-0 p-3 gap-3">
+          {/* Board row: eval bar + board */}
+          <div className="flex gap-2 items-stretch">
+            {/* Evaluation bar */}
+            <div style={{ alignSelf: 'stretch' }}>
+              <EvaluationBar evaluation={currentEval} />
             </div>
-          </div>
 
-          {/* Right: review panel */}
-          <div className="flex-1 min-h-0 overflow-hidden">
-            <ReviewPanel
-              review={review}
-              currentMoveAnalysis={currentMoveAnalysis}
-              currentIndex={currentMoveIndex}
-              onMoveClick={goToMove}
+            {/* Chess board */}
+            <ChessBoard
+              fen={currentFen}
+              orientation="white"
+              onMove={() => false}
+              interactive={false}
+              lastMove={lastMove}
             />
           </div>
-        </div>
 
-        {/* Eval graph */}
-        <div className="px-4 pb-2">
-          <EvalGraph
-            evaluations={evaluations}
-            currentMove={currentMoveIndex}
-            onMoveClick={(i) => goToMove(i + 1)}
+          {/* Eval graph */}
+          <div className="bg-gray-900 rounded-xl overflow-hidden border border-gray-800">
+            <EvalGraph
+              evaluations={evaluations}
+              moveAnalyses={review.moves}
+              currentMove={currentMoveIndex}
+              onMoveClick={(i) => goToMove(i + 1)}
+            />
+          </div>
+
+          {/* Navigation controls */}
+          <ReviewControls
+            currentIndex={currentMoveIndex}
+            totalMoves={review.moves.length}
+            onPrevious={goToPrevious}
+            onNext={goToNext}
+            onStart={goToStart}
+            onEnd={goToEnd}
           />
         </div>
 
-        {/* Navigation controls */}
-        <ReviewControls
-          currentIndex={currentMoveIndex}
-          totalMoves={review.moves.length}
-          onPrevious={goToPrevious}
-          onNext={goToNext}
-          onStart={goToStart}
-          onEnd={goToEnd}
-        />
+        {/* RIGHT COLUMN: review panel */}
+        <div className="flex-1 min-h-0 overflow-hidden lg:border-l border-gray-800">
+          <ReviewPanel
+            review={review}
+            currentMoveAnalysis={currentMoveAnalysis}
+            currentIndex={currentMoveIndex}
+            onMoveClick={goToMove}
+            whiteName={whiteName}
+            blackName={blackName}
+          />
+        </div>
       </div>
     </div>
   );
