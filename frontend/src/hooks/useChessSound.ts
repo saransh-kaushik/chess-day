@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react';
+import { useSettingsStore } from '../store/settingsStore';
 
 type SoundType = 'move' | 'capture' | 'check' | 'blunder' | 'mistake' | 'inaccuracy' | 'best' | 'navigate';
 
@@ -21,6 +22,7 @@ export const useChessSound = () => {
   }, []);
 
   const playSound = useCallback((type: SoundType) => {
+    if (useSettingsStore.getState().muted) return;
     const ctx = getCtx();
     if (!ctx) return;
 

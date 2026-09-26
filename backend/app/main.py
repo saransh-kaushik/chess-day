@@ -10,9 +10,10 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, games, online, analysis, stats
+from app.api import auth, games, online, analysis, stats, puzzles
 from app.config import settings
-from app.database import create_all_tables
+from app.database import create_all_tables, SessionLocal
+from app.seed_puzzles import seed_puzzles_if_empty
 
 logging.basicConfig(
     level=logging.INFO,
@@ -54,6 +55,13 @@ def on_startup() -> None:
     """
     create_all_tables()
 
+    # Seed the puzzles table on first run (idempotent — no-op if not empty).
+    db = SessionLocal()
+    try:
+        seed_puzzles_if_empty(db)
+    finally:
+        db.close()
+
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 
@@ -62,6 +70,7 @@ app.include_router(games.router)
 app.include_router(online.router)
 app.include_router(analysis.router)
 app.include_router(stats.router)
+app.include_router(puzzles.router)
 
 # ── Utility endpoints ─────────────────────────────────────────────────────────
 

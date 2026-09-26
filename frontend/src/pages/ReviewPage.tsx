@@ -147,7 +147,7 @@ export const ReviewPage: React.FC = () => {
           <span className="text-white font-semibold text-sm truncate">{openingLabel}</span>
         </div>
 
-        {user && !user.isGuest && (gameState.id || review.gameId) && (
+        {user && !user.is_guest && (gameState.id || review.gameId) && (
           <button
             onClick={() => requestDeepAnalysis(gameState.id || review.gameId)}
             disabled={isAnalyzing}

@@ -25,6 +25,13 @@ export interface ChessMove {
   clockRemaining?: number;
 }
 
+export interface Puzzle {
+  id: string;
+  fen: string;
+  rating: number | null;
+  source: string;
+}
+
 export interface GameState {
   id: string | null;
   mode: GameMode;

@@ -8,6 +8,7 @@ export interface UseChessGameReturn {
   gameState: any;
   legalMoves: string[];
   makeMove: (uci: string) => boolean;
+  undo: () => boolean;
   resetGame: (mode: GameMode, timeControl?: TimeControl) => void;
   resign: (color: PlayerColor) => void;
   offerDraw: () => void;
@@ -18,7 +19,7 @@ export interface UseChessGameReturn {
 
 export const useChessGame = (): UseChessGameReturn => {
   const [game, setGame] = useState(new Chess());
-  const { gameState, addMove, setGameState, setResult } = useGameStore();
+  const { gameState, addMove, popMove, setGameState, setResult } = useGameStore();
   const [legalMoves, setLegalMoves] = useState<string[]>([]);
 
   const updateGameState = useCallback((g: Chess) => {
@@ -67,6 +68,17 @@ export const useChessGame = (): UseChessGameReturn => {
     return false;
   };
 
+  const undo = (): boolean => {
+    const undone = game.undo();
+    if (!undone) return false;
+    const nextGame = new Chess();
+    nextGame.loadPgn(game.pgn());
+    setGame(nextGame);
+    popMove();
+    setGameState({ pgn: nextGame.pgn() });
+    return true;
+  };
+
   const resetGame = (mode: GameMode, timeControl?: TimeControl) => {
     const newGame = new Chess();
     setGame(newGame);
@@ -98,6 +110,7 @@ export const useChessGame = (): UseChessGameReturn => {
     gameState,
     legalMoves,
     makeMove,
+    undo,
     resetGame,
     resign,
     offerDraw,

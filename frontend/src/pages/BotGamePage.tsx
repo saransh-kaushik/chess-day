@@ -11,7 +11,7 @@ import { useGameStore } from '../store/gameStore';
 import { BOT_SKILL_LEVELS, TIME_CONTROLS } from '../config/constants';
 import { PlayerColor, TimeControl } from '../types/chess';
 import { useChessSound } from '../hooks/useChessSound';
-
+import { useClock } from '../hooks/useClock';
 
 type SetupStep = 'setup' | 'playing' | 'finished';
 
@@ -21,52 +21,95 @@ export const BotGamePage: React.FC = () => {
   const [playerColor, setPlayerColor] = useState<PlayerColor>('white');
   const [skillIndex, setSkillIndex] = useState(2); // Medium default
   const [selectedTimeControl, setSelectedTimeControl] = useState<TimeControl | null>(
-    TIME_CONTROLS[5] // Rapid 10+0
+    TIME_CONTROLS[5], // Rapid 10+0
   );
   const [isBotThinking, setIsBotThinking] = useState(false);
+  const [timedOut, setTimedOut] = useState<'white' | 'black' | null>(null);
 
-  const { game, gameState, legalMoves, makeMove, resetGame, resign, isGameOver } = useChessGame();
+  const { game, gameState, legalMoves, makeMove, undo, resetGame, resign, isGameOver } = useChessGame();
   const { isReady, getBestMove } = useStockfish();
+  const { getBestMove: getHint } = useStockfish();
   const { gameState: gs } = useGameStore();
   const { playSound } = useChessSound();
   const prevMoveCountRef = useRef(gs.moves.length);
+  const [flipped, setFlipped] = useState(false);
+  const [hintMove, setHintMove] = useState<{ from: string; to: string } | null>(null);
+  const [isHinting, setIsHinting] = useState(false);
 
   const botColor: PlayerColor = playerColor === 'white' ? 'black' : 'white';
-
   const skill = BOT_SKILL_LEVELS[skillIndex];
 
-  // Computed boolean — stable derivation, no function in deps
+  // Derived turn state (stable, from FEN string)
   const currentFen = game.fen();
   const isWhiteTurn = !currentFen.includes(' b ');
   const isBotTurnNow = (botColor === 'white' && isWhiteTurn) || (botColor === 'black' && !isWhiteTurn);
 
-  // Keep a callback for handlePlayerMove
-  const isBotTurn = useCallback(() => {
-    const fen = game.fen();
-    const whiteTurn = !fen.includes(' b ');
-    return (botColor === 'white' && whiteTurn) || (botColor === 'black' && !whiteTurn);
-  }, [game, botColor]);
+  // ── Clock ────────────────────────────────────────────────
+  const clockInitial = selectedTimeControl?.initial ?? 0;
+  const clockIncrement = selectedTimeControl?.increment ?? 0;
+  const hasTimeControl = clockInitial > 0;
 
-  // Play sound on every new move (player or bot)
+  const handleTimeout = useCallback(
+    (color: 'white' | 'black') => {
+      setTimedOut(color);
+      resign(color); // losing on time = resign that color
+      setStep('finished');
+    },
+    [resign],
+  );
+
+  const { whiteTime, blackTime, applyIncrement, resetClocks } = useClock({
+    whiteInitial: clockInitial,
+    blackInitial: clockInitial,
+    activeColor: step === 'playing' && !isGameOver ? (isWhiteTurn ? 'white' : 'black') : null,
+    gameOver: isGameOver || step !== 'playing',
+    increment: clockIncrement,
+    onTimeout: hasTimeControl ? handleTimeout : undefined,
+  });
+
+  // ── Sound on move ────────────────────────────────────────
   useEffect(() => {
     if (gs.moves.length === prevMoveCountRef.current) return;
     prevMoveCountRef.current = gs.moves.length;
     const lastMove = gs.moves[gs.moves.length - 1];
     if (!lastMove) return;
     const san = lastMove.san ?? '';
-    if (san.includes('#') || san.includes('+')) {
-      playSound('check');
-    } else if (san.includes('x')) {
-      playSound('capture');
-    } else {
-      playSound('move');
-    }
-  }, [gs.moves, playSound]);
+    if (san.includes('#') || san.includes('+')) playSound('check');
+    else if (san.includes('x')) playSound('capture');
+    else playSound('move');
 
-  // Trigger bot move whenever it's the bot's turn
+    // Apply increment to the player who just moved
+    applyIncrement(lastMove.color);
+    setHintMove(null);
+  }, [gs.moves, playSound, applyIncrement]);
+
+  const handleHint = async () => {
+    if (isBotThinking || isHinting) return;
+    setIsHinting(true);
+    try {
+      const uci = await getHint(currentFen, 15, 20);
+      if (uci && uci.length >= 4) {
+        setHintMove({ from: uci.slice(0, 2), to: uci.slice(2, 4) });
+      }
+    } finally {
+      setIsHinting(false);
+    }
+  };
+
+  const handleUndo = () => {
+    if (isBotThinking) return;
+    undo();
+  };
+
+  // ── Bot move trigger ─────────────────────────────────────
+  const isBotTurn = useCallback(() => {
+    const fen = game.fen();
+    const whiteTurn = !fen.includes(' b ');
+    return (botColor === 'white' && whiteTurn) || (botColor === 'black' && !whiteTurn);
+  }, [game, botColor]);
+
   useEffect(() => {
     if (step !== 'playing' || isGameOver || !isReady || !isBotTurnNow) return;
-
 
     let cancelled = false;
     setIsBotThinking(true);
@@ -78,14 +121,12 @@ export const BotGamePage: React.FC = () => {
         const doMove = (uci: string) => {
           const ok = makeMove(uci);
           if (!ok) {
-            // Stockfish returned an illegal move — fall back to first legal move
             const legalUcis = game.moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? ''));
             if (legalUcis.length > 0) makeMove(legalUcis[0]);
           }
           setIsBotThinking(false);
         };
 
-        // Small delay so the move feels natural
         setTimeout(() => {
           if (!cancelled) doMove(uciMove);
         }, 300 + Math.random() * 400);
@@ -94,20 +135,21 @@ export const BotGamePage: React.FC = () => {
         if (!cancelled) setIsBotThinking(false);
       });
 
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentFen, step, isGameOver, isReady, skill.stockfishSkill]);
 
+  // ── Handlers ─────────────────────────────────────────────
   const handleStart = () => {
     resetGame('bot', selectedTimeControl ?? undefined);
+    resetClocks(clockInitial, clockInitial);
+    setTimedOut(null);
     setStep('playing');
   };
 
-  const handlePlayerMove = (uci: string) => {
-    if (isBotThinking || isBotTurn()) return;
-    makeMove(uci);
+  const handlePlayerMove = (uci: string): boolean => {
+    if (isBotThinking || isBotTurn()) return false;
+    return makeMove(uci);
   };
 
   const handleResign = () => {
@@ -119,11 +161,9 @@ export const BotGamePage: React.FC = () => {
     if (isGameOver && step === 'playing') setStep('finished');
   }, [isGameOver, step]);
 
-  const handleReview = () => {
-    navigate('/review');
-  };
+  const handleReview = () => navigate('/review');
 
-  // ── Setup Screen ──
+  // ── Setup Screen ─────────────────────────────────────────
   if (step === 'setup') {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
@@ -140,14 +180,14 @@ export const BotGamePage: React.FC = () => {
                   onClick={() =>
                     setPlayerColor(
                       c === 'random'
-                        ? Math.random() > 0.5
-                          ? 'white'
-                          : 'black'
-                        : c
+                        ? Math.random() > 0.5 ? 'white' : 'black'
+                        : c,
                     )
                   }
                   className={`py-2 rounded capitalize text-sm font-medium transition-colors ${
-                    (c === 'random' ? false : playerColor === c)
+                    c === 'random'
+                      ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      : playerColor === c
                       ? 'bg-amber-500 text-black'
                       : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                   }`}
@@ -187,7 +227,7 @@ export const BotGamePage: React.FC = () => {
                   key={i}
                   onClick={() =>
                     setSelectedTimeControl(
-                      tc.initial === 0 ? null : { initial: tc.initial, increment: tc.increment }
+                      tc.initial === 0 ? null : { initial: tc.initial, increment: tc.increment },
                     )
                   }
                   className={`py-1 px-2 rounded text-xs transition-colors ${
@@ -215,18 +255,19 @@ export const BotGamePage: React.FC = () => {
     );
   }
 
-  // ── Finished Screen ──
+  // ── Finished Screen ───────────────────────────────────────
   if (step === 'finished') {
-    const resultText =
-      gameState.result === '1-0'
-        ? playerColor === 'white'
-          ? 'You won! 🎉'
-          : 'Bot wins'
-        : gameState.result === '0-1'
-        ? playerColor === 'black'
-          ? 'You won! 🎉'
-          : 'Bot wins'
-        : 'Draw';
+    let resultText: string;
+    if (timedOut) {
+      resultText = timedOut === playerColor ? 'Time out! You lost.' : 'Bot ran out of time! You win 🎉';
+    } else {
+      resultText =
+        gameState.result === '1-0'
+          ? playerColor === 'white' ? 'You won! 🎉' : 'Bot wins'
+          : gameState.result === '0-1'
+          ? playerColor === 'black' ? 'You won! 🎉' : 'Bot wins'
+          : 'Draw';
+    }
 
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -252,21 +293,34 @@ export const BotGamePage: React.FC = () => {
     );
   }
 
-  // ── Game Screen ──
-  const boardOrientation = playerColor;
+  // ── Game Screen ───────────────────────────────────────────
+  const baseOrientation = playerColor;
+  const boardOrientation = flipped
+    ? baseOrientation === 'white' ? 'black' : 'white'
+    : baseOrientation;
   const isInteractive = !isBotThinking && !isGameOver && !isBotTurn();
+
+  // Show opponent clock on top, player clock on bottom
+  const opponentColor = botColor;
+  const opponentTime = opponentColor === 'white' ? whiteTime : blackTime;
+  const playerTime = playerColor === 'white' ? whiteTime : blackTime;
+
+  const lastMove =
+    gs.moves.length > 0
+      ? { from: gs.moves[gs.moves.length - 1].uci.slice(0, 2), to: gs.moves[gs.moves.length - 1].uci.slice(2, 4) }
+      : null;
 
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col">
       <div className="flex-1 flex flex-col lg:flex-row gap-4 p-4 max-w-6xl mx-auto w-full">
         {/* Board area */}
-        <div className="flex flex-col items-center gap-2 flex-1">
-          {/* Bot clock (opponent) */}
-          {selectedTimeControl && (
+        <div className="flex flex-col items-center gap-3 flex-1">
+          {/* Opponent (bot) clock — top */}
+          {hasTimeControl && (
             <Clock
-              timeRemaining={gameState.blackTime ?? selectedTimeControl.initial}
-              isActive={isBotTurn() && !isGameOver}
-              color={botColor}
+              timeRemaining={opponentTime}
+              isActive={isBotTurnNow && !isGameOver}
+              color={opponentColor}
             />
           )}
 
@@ -281,31 +335,21 @@ export const BotGamePage: React.FC = () => {
           <ChessBoard
             fen={game.fen()}
             orientation={boardOrientation}
-            onMove={(from: string, to: string, piece: string) => {
-              const promo = piece?.toLowerCase() === 'p' && (to[1] === '8' || to[1] === '1')
-                ? 'q'
-                : undefined;
-              handlePlayerMove(from + to + (promo ?? ''));
-              return true;
-            }}
-            legalMoves={isInteractive ? legalMoves : []}
-            lastMove={
-              gs.moves.length > 0
-                ? {
-                    from: gs.moves[gs.moves.length - 1].uci.slice(0, 2),
-                    to: gs.moves[gs.moves.length - 1].uci.slice(2, 4),
-                  }
-                : null
+            onMove={(from: string, to: string, piece: string) =>
+              handlePlayerMove(from + to + piece)
             }
+            legalMoves={isInteractive ? legalMoves : []}
+            lastMove={lastMove}
+            hintMove={hintMove}
             isCheck={game.inCheck()}
             interactive={isInteractive}
           />
 
-          {/* Player clock */}
-          {selectedTimeControl && (
+          {/* Player clock — bottom */}
+          {hasTimeControl && (
             <Clock
-              timeRemaining={gameState.whiteTime ?? selectedTimeControl.initial}
-              isActive={!isBotTurn() && !isGameOver}
+              timeRemaining={playerTime}
+              isActive={!isBotTurnNow && !isGameOver}
               color={playerColor}
             />
           )}
@@ -326,8 +370,17 @@ export const BotGamePage: React.FC = () => {
             onResign={handleResign}
             onOfferDraw={() => {}}
             onNewGame={() => setStep('setup')}
+            onFlip={() => setFlipped((f) => !f)}
+            onUndo={gs.moves.length > 0 && !isBotThinking ? handleUndo : undefined}
             gameOver={isGameOver}
           />
+          <button
+            onClick={handleHint}
+            disabled={isBotThinking || isHinting}
+            className="py-2 px-3 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isHinting ? 'Thinking…' : 'Hint'}
+          </button>
         </div>
       </div>
     </div>

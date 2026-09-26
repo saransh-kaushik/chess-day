@@ -22,7 +22,7 @@ export const StatsPage: React.FC = () => {
       try {
         const [s, g] = await Promise.all([getMyStats(), listGames(1, 10)]);
         setStats(s);
-        setRecentGames(g);
+        setRecentGames(g.games);
       } catch (e: any) {
         setError('Could not load stats. Make sure the backend is running.');
       } finally {
@@ -33,7 +33,7 @@ export const StatsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
         <LoadingSpinner size="lg" />
       </div>
     );
@@ -41,7 +41,7 @@ export const StatsPage: React.FC = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
         <div className="text-center space-y-3">
           <p className="text-red-400">{error}</p>
           <button
@@ -63,7 +63,7 @@ export const StatsPage: React.FC = () => {
       : '0.0';
 
   const statCard = (label: string, value: string | number, sub?: string) => (
-    <div className="bg-gray-800 rounded-lg p-4 text-center">
+    <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 text-center">
       <div className="text-2xl font-bold text-white">{value}</div>
       <div className="text-gray-400 text-xs mt-1">{label}</div>
       {sub && <div className="text-gray-500 text-xs">{sub}</div>}
@@ -71,7 +71,7 @@ export const StatsPage: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen bg-gray-950">
       <div className="max-w-3xl mx-auto p-4 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -96,7 +96,7 @@ export const StatsPage: React.FC = () => {
         </div>
 
         {/* Accuracy */}
-        <div className="bg-gray-800 rounded-lg p-5">
+        <div className="bg-gray-900 border border-gray-800 rounded-lg p-5">
           <h2 className="text-white font-semibold mb-4">Performance</h2>
           <div className="grid grid-cols-3 gap-4">
             <div className="text-center">
@@ -117,7 +117,7 @@ export const StatsPage: React.FC = () => {
         </div>
 
         {/* Mistake breakdown */}
-        <div className="bg-gray-800 rounded-lg p-5">
+        <div className="bg-gray-900 border border-gray-800 rounded-lg p-5">
           <h2 className="text-white font-semibold mb-4">Mistake Breakdown</h2>
           <div className="space-y-3">
             {[
@@ -149,7 +149,7 @@ export const StatsPage: React.FC = () => {
 
         {/* Recent games */}
         {recentGames.length > 0 && (
-          <div className="bg-gray-800 rounded-lg p-5">
+          <div className="bg-gray-900 border border-gray-800 rounded-lg p-5">
             <h2 className="text-white font-semibold mb-4">Recent Games</h2>
             <div className="space-y-2">
               {recentGames.map((g) => (

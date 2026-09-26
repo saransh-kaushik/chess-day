@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Chessboard } from 'react-chessboard';
 import { Chess } from 'chess.js';
+import { PromotionDialog } from './PromotionDialog';
 
 interface ChessBoardProps {
   fen: string;
@@ -12,6 +13,7 @@ interface ChessBoardProps {
   showCoordinates?: boolean;
   interactive?: boolean;
   promotionPiece?: string;
+  hintMove?: { from: string; to: string } | null;
 }
 
 /**
@@ -27,9 +29,30 @@ export const ChessBoard = ({
   lastMove,
   showCoordinates = true,
   interactive = true,
+  hintMove,
 }: ChessBoardProps) => {
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [legalSquares, setLegalSquares] = useState<string[]>([]);
+  const [pendingPromotion, setPendingPromotion] = useState<{ from: string; to: string } | null>(
+    null,
+  );
+
+  // Returns true if moving from -> to is a pawn promotion in the current position
+  const isPromotionMove = useCallback(
+    (from: string, to: string): boolean => {
+      try {
+        const chess = new Chess(fen);
+        const moves = chess.moves({
+          square: from as Parameters<typeof chess.moves>[0]['square'],
+          verbose: true,
+        });
+        return moves.some((m) => m.to === to && m.flags.includes('p'));
+      } catch {
+        return false;
+      }
+    },
+    [fen],
+  );
 
   // Compute legal moves from current FEN for the selected piece
   const getLegalTargets = useCallback(
@@ -52,6 +75,12 @@ export const ChessBoard = ({
 
       // If a piece is already selected and this is a legal target → make the move
       if (selectedSquare && legalSquares.includes(square)) {
+        if (isPromotionMove(selectedSquare, square)) {
+          setPendingPromotion({ from: selectedSquare, to: square });
+          setSelectedSquare(null);
+          setLegalSquares([]);
+          return;
+        }
         const ok = onMove(selectedSquare, square, '');
         if (ok) {
           setSelectedSquare(null);
@@ -75,17 +104,36 @@ export const ChessBoard = ({
   );
 
   const handlePieceDrop = useCallback(
-    (sourceSquare: string, targetSquare: string, piece: string) => {
+    (sourceSquare: string, targetSquare: string) => {
       if (!interactive) return false;
-      const ok = onMove(sourceSquare, targetSquare, piece);
+      if (isPromotionMove(sourceSquare, targetSquare)) {
+        setPendingPromotion({ from: sourceSquare, to: targetSquare });
+        setSelectedSquare(null);
+        setLegalSquares([]);
+        return true;
+      }
+      const ok = onMove(sourceSquare, targetSquare, '');
       if (ok) {
         setSelectedSquare(null);
         setLegalSquares([]);
       }
       return ok;
     },
-    [interactive, onMove],
+    [interactive, onMove, isPromotionMove],
   );
+
+  const handlePromotionSelect = useCallback(
+    (piece: 'q' | 'r' | 'b' | 'n') => {
+      if (!pendingPromotion) return;
+      onMove(pendingPromotion.from, pendingPromotion.to, piece);
+      setPendingPromotion(null);
+    },
+    [pendingPromotion, onMove],
+  );
+
+  const handlePromotionCancel = useCallback(() => {
+    setPendingPromotion(null);
+  }, []);
 
   // Build square styles
   const customSquareStyles: Record<string, React.CSSProperties> = {};
@@ -95,6 +143,13 @@ export const ChessBoard = ({
     const highlight: React.CSSProperties = { backgroundColor: 'rgba(245, 158, 11, 0.35)' };
     customSquareStyles[lastMove.from] = highlight;
     customSquareStyles[lastMove.to] = highlight;
+  }
+
+  // Hint move highlight (green tint)
+  if (hintMove) {
+    const hintHighlight: React.CSSProperties = { backgroundColor: 'rgba(34, 197, 94, 0.45)' };
+    customSquareStyles[hintMove.from] = { ...customSquareStyles[hintMove.from], ...hintHighlight };
+    customSquareStyles[hintMove.to] = { ...customSquareStyles[hintMove.to], ...hintHighlight };
   }
 
   // Selected square highlight
@@ -118,8 +173,14 @@ export const ChessBoard = ({
     };
   });
 
+  const promotionColor: 'w' | 'b' = pendingPromotion
+    ? pendingPromotion.from[1] === '7'
+      ? 'w'
+      : 'b'
+    : 'w';
+
   return (
-    <div className="w-full max-w-2xl mx-auto">
+    <div className="w-full max-w-2xl mx-auto rounded-[1.1rem] border-4 border-slate-800/90 p-1.5 shadow-2xl shadow-black/35">
       <Chessboard
         position={fen}
         boardOrientation={orientation}
@@ -128,6 +189,14 @@ export const ChessBoard = ({
         arePiecesDraggable={interactive}
         showBoardNotation={showCoordinates}
         customSquareStyles={customSquareStyles}
+        customLightSquareStyle={{ backgroundColor: '#e7d6b5' }}
+        customDarkSquareStyle={{ backgroundColor: '#7b6047' }}
+      />
+      <PromotionDialog
+        isOpen={pendingPromotion !== null}
+        color={promotionColor}
+        onSelect={handlePromotionSelect}
+        onCancel={handlePromotionCancel}
       />
     </div>
   );

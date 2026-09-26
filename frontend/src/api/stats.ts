@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import { LeaderboardEntry, OpeningStat } from '../types/api';
 
 export interface PlayerStats {
   id: string;
@@ -23,5 +24,29 @@ export const getMyStats = async (): Promise<PlayerStats> => {
 
 export const getUserStats = async (userId: string): Promise<PlayerStats> => {
   const res = await apiClient.get<PlayerStats>(`/stats/${userId}`);
+  return res.data;
+};
+
+export interface LeaderboardOut {
+  entries: LeaderboardEntry[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export const getLeaderboard = async (page = 1, pageSize = 20): Promise<LeaderboardOut> => {
+  const res = await apiClient.get<LeaderboardOut>('/stats/leaderboard', {
+    params: { page, page_size: pageSize },
+  });
+  return res.data;
+};
+
+export interface OpeningStatsOut {
+  openings: OpeningStat[];
+  total: number;
+}
+
+export const getMyOpenings = async (): Promise<OpeningStatsOut> => {
+  const res = await apiClient.get<OpeningStatsOut>('/stats/openings');
   return res.data;
 };

@@ -31,6 +31,13 @@ export interface CompleteGameRequest {
   result: string;
 }
 
+export interface GameListOut {
+  games: GameResponse[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
 export const createGame = async (data: CreateGameRequest): Promise<GameResponse> => {
   const res = await apiClient.post<GameResponse>('/games', data);
   return res.data;
@@ -41,8 +48,8 @@ export const getGame = async (gameId: string): Promise<GameResponse> => {
   return res.data;
 };
 
-export const listGames = async (page = 1, pageSize = 20): Promise<GameResponse[]> => {
-  const res = await apiClient.get<GameResponse[]>('/games', {
+export const listGames = async (page = 1, pageSize = 20): Promise<GameListOut> => {
+  const res = await apiClient.get<GameListOut>('/games', {
     params: { page, page_size: pageSize },
   });
   return res.data;

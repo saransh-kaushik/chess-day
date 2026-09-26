@@ -12,9 +12,9 @@ export const Clock = ({ timeRemaining, isActive, color }: ClockProps) => {
 
   return (
     <div
-      className={`text-2xl font-mono px-4 py-2 rounded flex items-center gap-2 ${
-        isActive ? 'bg-blue-800' : 'bg-gray-700'
-      } ${isLowTime ? 'bg-red-800 text-white animate-pulse' : ''}`}
+      className={`min-w-32 rounded-xl border px-4 py-2 text-2xl font-mono font-bold shadow-lg flex items-center gap-2 ${
+        isActive ? 'border-amber-300/50 bg-amber-400 text-slate-950 shadow-amber-500/15' : 'border-white/10 bg-slate-800 text-slate-100'
+      } ${isLowTime ? 'border-rose-400 bg-rose-500 text-white animate-pulse' : ''}`}
     >
       {color && <span className="text-xs text-gray-300 capitalize">{color}:</span>}
       <span>{timeStr}</span>

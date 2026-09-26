@@ -11,6 +11,8 @@ import { useGameStore } from '../store/gameStore';
 import { WS_BASE_URL } from '../config/constants';
 import { Chess } from 'chess.js';
 import { PlayerColor } from '../types/chess';
+import { Modal } from '../components/ui/Modal';
+import { Button } from '../components/ui/Button';
 
 type OnlineStatus = 'auth' | 'matchmaking' | 'playing' | 'finished';
 
@@ -24,12 +26,14 @@ export const OnlineGamePage: React.FC = () => {
   const [gameId, setGameId] = useState<string | null>(null);
   const [game, setGame] = useState(new Chess());
   const [opponentName, setOpponentName] = useState<string>('Opponent');
+  const [drawOfferPending, setDrawOfferPending] = useState(false);
+  const [flipped, setFlipped] = useState(false);
 
   const wsUrl = gameId
     ? `${WS_BASE_URL}/online/game/${gameId}`
     : `${WS_BASE_URL}/online/matchmaking`;
 
-  const { sendMove, sendResign, sendDrawOffer, lastMessage, connectionError } =
+  const { sendMove, sendResign, sendDrawOffer, sendDrawAccept, sendDrawDecline, lastMessage, connectionError } =
     useWebSocket(status === 'matchmaking' || status === 'playing' ? wsUrl : null, token ?? undefined);
 
   // Handle messages from server
@@ -75,7 +79,11 @@ export const OnlineGamePage: React.FC = () => {
         break;
 
       case 'draw_offered':
-        // In a real app show a dialog; for now auto-show via state
+        if (msg.by !== myColor) setDrawOfferPending(true);
+        break;
+
+      case 'draw_declined':
+        setDrawOfferPending(false);
         break;
 
       case 'opponent_disconnected':
@@ -98,9 +106,7 @@ export const OnlineGamePage: React.FC = () => {
 
   const handleMove = (from: string, to: string, piece?: string) => {
     if (!isMyTurn) return false;
-    const promo =
-      piece?.toLowerCase() === 'p' && (to[1] === '8' || to[1] === '1') ? 'q' : undefined;
-    sendMove(from + to + (promo ?? ''));
+    sendMove(from + to + (piece ?? ''));
     return true;
   };
 
@@ -227,7 +233,7 @@ export const OnlineGamePage: React.FC = () => {
 
           <ChessBoard
             fen={game.fen()}
-            orientation={myColor}
+            orientation={flipped ? (myColor === 'white' ? 'black' : 'white') : myColor}
             onMove={handleMove}
             legalMoves={legalMoves}
             lastMove={
@@ -268,10 +274,33 @@ export const OnlineGamePage: React.FC = () => {
             onResign={() => { sendResign(); setStatus('finished'); }}
             onOfferDraw={sendDrawOffer}
             onNewGame={() => { setStatus('auth'); setGameId(null); }}
+            onFlip={() => setFlipped((f) => !f)}
             gameOver={gameState.status === 'completed'}
           />
         </div>
       </div>
+
+      <Modal
+        isOpen={drawOfferPending}
+        onClose={() => { sendDrawDecline(); setDrawOfferPending(false); }}
+        title="Draw Offer"
+      >
+        <p className="text-gray-300 mb-4">Opponent offers a draw.</p>
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => { sendDrawDecline(); setDrawOfferPending(false); }}
+          >
+            Decline
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => { sendDrawAccept(); setDrawOfferPending(false); }}
+          >
+            Accept
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 };

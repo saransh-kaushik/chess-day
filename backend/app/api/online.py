@@ -30,6 +30,7 @@ from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from jose import JWTError
 from sqlalchemy.orm import Session
 
+from app.api.games import _increment_stats_for_game
 from app.core.auth import decode_access_token
 from app.core.chess_validator import ChessValidator
 from app.core.game_manager import game_manager, matchmaking_queue
@@ -377,6 +378,7 @@ async def _end_game(
     game.status = "completed"
     game.result = result
     game.completed_at = datetime.now(timezone.utc)
+    _increment_stats_for_game(game, db)
     db.commit()
 
     await room.broadcast({

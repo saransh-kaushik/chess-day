@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from app.dependencies import get_current_user, get_db, get_optional_user
 from app.models.game import Game, STANDARD_FEN
 from app.models.move import Move
+from app.models.player_stats import PlayerStats
 from app.models.user import User
 from app.schemas.game import GameCompleteRequest, GameCreate, GameListOut, GameOut
 
@@ -44,6 +45,43 @@ def _assert_participant(game: Game, user: User) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You are not a participant in this game",
         )
+
+
+def _increment_stats_for_game(game: Game, db: Session) -> None:
+    """
+    Update games_played/wins/losses/draws on PlayerStats for both participants
+    of a just-completed *game*, based on `game.result`.
+
+    Guests (no PlayerStats row) are skipped silently, mirroring how
+    `analysis._update_player_stats` handles missing stats rows. Callers must
+    invoke this exactly once per game completion (i.e. at the single point
+    where `game.status` transitions to "completed").
+    """
+    result = game.result
+    for player_id, color in (
+        (game.white_player_id, "white"),
+        (game.black_player_id, "black"),
+    ):
+        if not player_id:
+            continue
+        stats = db.query(PlayerStats).filter(PlayerStats.user_id == player_id).first()
+        if stats is None:
+            continue  # Guests have no stats
+
+        stats.games_played += 1
+        if result == "1/2-1/2":
+            stats.draws += 1
+        elif result == "1-0":
+            if color == "white":
+                stats.wins += 1
+            else:
+                stats.losses += 1
+        elif result == "0-1":
+            if color == "black":
+                stats.wins += 1
+            else:
+                stats.losses += 1
+        db.add(stats)
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
@@ -161,6 +199,7 @@ def resign(
     game.status = "completed"
     game.result = result
     game.completed_at = datetime.now(timezone.utc)
+    _increment_stats_for_game(game, db)
     db.commit()
     db.refresh(game)
     return GameOut.model_validate(game)
@@ -211,6 +250,7 @@ def draw_accept(
     game.status = "completed"
     game.result = "1/2-1/2"
     game.completed_at = datetime.now(timezone.utc)
+    _increment_stats_for_game(game, db)
     db.commit()
     db.refresh(game)
     return GameOut.model_validate(game)
@@ -249,6 +289,7 @@ def complete_game(
     game.completed_at = datetime.now(timezone.utc)
     if body.current_fen:
         game.current_fen = body.current_fen
+    _increment_stats_for_game(game, db)
 
     # If PGN is provided and no individual moves are stored yet, populate moves table
     if body.pgn and not game.moves:

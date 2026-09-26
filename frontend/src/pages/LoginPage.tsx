@@ -90,8 +90,8 @@ export const LoginPage: React.FC = () => {
   const labelClass = 'block text-gray-400 text-xs mb-1';
 
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-      <div className="bg-gray-800 rounded-xl w-full max-w-md overflow-hidden shadow-xl">
+    <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
+      <div className="bg-gray-900 border border-gray-800 rounded-xl w-full max-w-md overflow-hidden shadow-xl">
         {/* Header */}
         <div className="p-6 pb-0">
           <h1 className="text-2xl font-bold text-white text-center mb-4">Chess Day</h1>

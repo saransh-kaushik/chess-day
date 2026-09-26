@@ -20,8 +20,8 @@ export const MoveList: React.FC<MoveListProps> = ({ moves, currentIndex, onMoveC
   }
 
   return (
-    <div className="bg-gray-800 p-4 rounded-lg h-64 overflow-y-auto">
-      <h3 className="font-bold mb-2 text-white text-sm">Moves</h3>
+    <div className="app-panel h-64 overflow-y-auto p-4">
+      <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Moves</h3>
       <div className="grid grid-cols-3 gap-1 text-sm">
         {rows.map((row) => (
           <React.Fragment key={row.num}>
@@ -30,8 +30,8 @@ export const MoveList: React.FC<MoveListProps> = ({ moves, currentIndex, onMoveC
               onClick={() => onMoveClick(row.whiteIdx)}
               className={`font-mono text-left px-1 rounded transition-colors ${
                 currentIndex === row.whiteIdx
-                  ? 'bg-amber-600 text-white'
-                  : 'text-gray-200 hover:bg-gray-700'
+                  ? 'bg-amber-400 text-slate-950 font-bold'
+                  : 'text-gray-200 hover:bg-white/10'
               }`}
             >
               {row.white?.san ?? ''}
@@ -40,8 +40,8 @@ export const MoveList: React.FC<MoveListProps> = ({ moves, currentIndex, onMoveC
               onClick={() => row.black && onMoveClick(row.blackIdx)}
               className={`font-mono text-left px-1 rounded transition-colors ${
                 currentIndex === row.blackIdx
-                  ? 'bg-amber-600 text-white'
-                  : 'text-gray-200 hover:bg-gray-700'
+                  ? 'bg-amber-400 text-slate-950 font-bold'
+                  : 'text-gray-200 hover:bg-white/10'
               }`}
             >
               {row.black?.san ?? ''}

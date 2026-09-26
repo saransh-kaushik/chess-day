@@ -5,6 +5,7 @@ interface GameStore {
   gameState: GameState;
   setGameState: (state: Partial<GameState>) => void;
   addMove: (move: ChessMove) => void;
+  popMove: () => void;
   resetGame: () => void;
   setResult: (result: GameResult, status: GameStatus) => void;
   updateClock: (white: number, black: number) => void;
@@ -37,6 +38,18 @@ export const useGameStore = create<GameStore>((set) => ({
       isWhiteTurn: move.color === 'black'
     } 
   })),
+  popMove: () => set((prev) => {
+    const moves = prev.gameState.moves.slice(0, -1);
+    const last = moves[moves.length - 1];
+    return {
+      gameState: {
+        ...prev.gameState,
+        moves,
+        currentFen: last ? last.fenAfter : initialGameState.currentFen,
+        isWhiteTurn: last ? last.color === 'black' : true,
+      },
+    };
+  }),
   resetGame: () => set({ gameState: initialGameState }),
   setResult: (result, status) => set((prev) => ({ gameState: { ...prev.gameState, result, status } })),
   updateClock: (white, black) => set((prev) => ({ gameState: { ...prev.gameState, whiteTime: white, blackTime: black } })),
